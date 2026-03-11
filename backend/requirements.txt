@@ -7,4 +7,5 @@ apscheduler==3.10.4
 python-dotenv==1.0.0
 pydantic==2.5.0
 lxml==4.9.3
+psycopg2-binary==2.9.9
 playwright==1.44.0

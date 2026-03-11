@@ -23,17 +23,6 @@ logger = logging.getLogger(__name__)
 
 Base.metadata.create_all(bind=engine)
 
-# Additive migration: add columns introduced after initial schema creation
-with engine.connect() as _conn:
-    for _stmt in [
-        "ALTER TABLE jobs ADD COLUMN posted_at DATETIME",
-    ]:
-        try:
-            _conn.execute(__import__("sqlalchemy").text(_stmt))
-            _conn.commit()
-        except Exception:
-            pass  # column already exists
-
 
 SEED_WEBSITES = [
     # Greenhouse
