@@ -242,9 +242,9 @@ def _scrape_ashby(slug: str, keywords: list[str]) -> tuple[list[dict], Optional[
 def _scrape_workatastartup(url: str, keywords: list[str]) -> tuple[list[dict], Optional[str]]:
     """Playwright scraper for workatastartup.com/jobs."""
     try:
-        from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+        from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout, Error as PWError
     except ImportError:
-        return [], "Playwright not installed. Run: pip install playwright && playwright install chromium"
+        return [], "Playwright package not installed (not available in this environment)"
 
     logger.info("[waas] Loading %s with Playwright", url)
     try:
@@ -261,6 +261,11 @@ def _scrape_workatastartup(url: str, keywords: list[str]) -> tuple[list[dict], O
             browser.close()
     except PWTimeout:
         return [], f"Playwright timed out loading {url}"
+    except PWError as exc:
+        msg = str(exc)
+        if "Executable doesn't exist" in msg or "playwright install" in msg:
+            return [], "Playwright browsers not installed in this environment (run: playwright install chromium)"
+        return [], f"Playwright browser error: {msg[:200]}"
     except Exception as exc:
         return [], f"Playwright error: {exc}"
 
@@ -324,9 +329,9 @@ def _scrape_workatastartup(url: str, keywords: list[str]) -> tuple[list[dict], O
 
 def _scrape_playwright(url: str, keywords: list[str]) -> tuple[list[dict], Optional[str]]:
     try:
-        from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+        from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout, Error as PWError
     except ImportError:
-        return [], "Playwright not installed. Run: pip install playwright && playwright install chromium"
+        return [], "Playwright package not installed (not available in this environment)"
 
     try:
         with sync_playwright() as pw:
@@ -337,6 +342,11 @@ def _scrape_playwright(url: str, keywords: list[str]) -> tuple[list[dict], Optio
             browser.close()
     except PWTimeout:
         return [], f"Playwright timed out loading {url}"
+    except PWError as exc:
+        msg = str(exc)
+        if "Executable doesn't exist" in msg or "playwright install" in msg:
+            return [], "Playwright browsers not installed in this environment (run: playwright install chromium)"
+        return [], f"Playwright browser error: {msg[:200]}"
     except Exception as exc:
         return [], f"Playwright error: {exc}"
 
