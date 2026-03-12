@@ -16,16 +16,13 @@ from typing import Optional
 
 load_dotenv()
 
-from database import Base, engine, get_db
+from database import Base, engine, get_db, init_db
 from models import Job, JobResponse, Resume, Website, WebsiteCreate, WebsiteResponse
 from scheduler import check_all_websites, start_scheduler, stop_scheduler, update_schedule
 from email_service import send_new_jobs_email
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)
-
-Base.metadata.create_all(bind=engine)
-
 
 SEED_WEBSITES = [
     # Greenhouse
@@ -100,6 +97,7 @@ def _seed_websites(db) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    init_db()  # lazy: only connects here, with retry
     db = next(get_db())
     try:
         _seed_websites(db)
