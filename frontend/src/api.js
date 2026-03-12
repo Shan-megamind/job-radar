@@ -41,4 +41,16 @@ export const api = {
 
   // Stats
   getStats: () => request('/stats'),
+
+  // Resume / ATS
+  getResume: () => request('/resume'),
+  atsScore: (jobId) => request('/ats-score', { method: 'POST', body: JSON.stringify({ job_id: jobId }) }),
+  atsTempScore: async (jobId, file) => {
+    const form = new FormData()
+    form.append('job_id', jobId)
+    form.append('file', file)
+    const res = await fetch(`${BASE}/ats-score-temp`, { method: 'POST', body: form })
+    if (!res.ok) { const text = await res.text(); throw new Error(text || `HTTP ${res.status}`) }
+    return res.json()
+  },
 }

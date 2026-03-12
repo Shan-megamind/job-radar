@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { api } from '../api'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -76,6 +76,12 @@ export default function Dashboard({ stats, onStatsChange, isAdmin }) {
   const [roleTab, setRoleTab]         = useState('all')    // all | intern | apm
   const [locationFilter, setLocation] = useState('us_only') // all | us_only | remote | remote_us
   const [alert, setAlert] = useState(null)
+  const [hasResume, setHasResume] = useState(false)
+  const [atsScores, setAtsScores] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('ats_scores') || '{}') } catch { return {} }
+  })
+  const [atsModal, setAtsModal] = useState(null)  // null | { job, score, matched, missing, tailoredScore }
+  const tailoredInputRef = useRef(null)
 
   const loadJobs = useCallback(async () => {
     setLoading(true)
@@ -90,6 +96,51 @@ export default function Dashboard({ stats, onStatsChange, isAdmin }) {
   }, [newFilter])
 
   useEffect(() => { loadJobs() }, [loadJobs])
+
+  useEffect(() => {
+    api.getResume().then(r => setHasResume(r.exists)).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    const toSave = Object.fromEntries(
+      Object.entries(atsScores).filter(([, v]) => v && v !== 'loading')
+    )
+    localStorage.setItem('ats_scores', JSON.stringify(toSave))
+  }, [atsScores])
+
+  function clearAtsCache() {
+    localStorage.removeItem('ats_scores')
+    setAtsScores({})
+  }
+
+  async function handleATSClick(e, job) {
+    e.stopPropagation()
+    const cached = atsScores[job.id]
+    if (cached && cached !== 'loading') {
+      setAtsModal({ job, ...cached, tailoredScore: null })
+      return
+    }
+    setAtsScores(prev => ({ ...prev, [job.id]: 'loading' }))
+    try {
+      const result = await api.atsScore(job.id)
+      setAtsScores(prev => ({ ...prev, [job.id]: result }))
+      setAtsModal({ job, ...result, tailoredScore: null })
+    } catch {
+      setAtsScores(prev => ({ ...prev, [job.id]: undefined }))
+    }
+  }
+
+  async function handleTailoredUpload(file) {
+    if (!file || !atsModal) return
+    const jobId = atsModal.job.id
+    setAtsModal(prev => ({ ...prev, tailoredScore: 'loading' }))
+    try {
+      const result = await api.atsTempScore(jobId, file)
+      setAtsModal(prev => ({ ...prev, tailoredScore: result }))
+    } catch {
+      setAtsModal(prev => ({ ...prev, tailoredScore: null }))
+    }
+  }
 
   async function handleCheckNow() {
     setChecking(true)
@@ -129,6 +180,121 @@ export default function Dashboard({ stats, onStatsChange, isAdmin }) {
 
   return (
     <div>
+      {/* ATS Modal */}
+      {atsModal && (() => {
+        const tailored = atsModal.tailoredScore
+        const activeKw = (tailored && tailored !== 'loading') ? tailored : atsModal
+        return (
+          <div
+            onClick={() => setAtsModal(null)}
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              zIndex: 1000, padding: 16,
+            }}
+          >
+            <div
+              onClick={e => e.stopPropagation()}
+              style={{
+                background: '#fff', borderRadius: 14, padding: 28,
+                width: '100%', maxWidth: 500, boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+                maxHeight: '85vh', overflowY: 'auto',
+              }}
+            >
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+                <div>
+                  <div style={{ fontSize: 13, color: '#64748b', marginBottom: 2 }}>ATS Score</div>
+                  <div style={{ fontSize: 13, fontWeight: 600, color: '#0f172a' }}>{atsModal.job.title}</div>
+                  {atsModal.job.company && <div style={{ fontSize: 12, color: '#94a3b8' }}>{atsModal.job.company}</div>}
+                </div>
+                <button onClick={() => setAtsModal(null)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', color: '#94a3b8', lineHeight: 1, padding: '0 4px' }}>×</button>
+              </div>
+
+              {/* Score(s) */}
+              {(tailored && tailored !== 'loading') ? (
+                <div style={{ display: 'flex', gap: 24, justifyContent: 'center', marginBottom: 24 }}>
+                  {[{ label: 'Base resume', s: atsModal.score }, { label: 'Tailored', s: tailored.score }].map(({ label, s }) => (
+                    <div key={label} style={{ textAlign: 'center' }}>
+                      <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>{label}</div>
+                      <div style={{ fontSize: 52, fontWeight: 800, lineHeight: 1, color: s >= 70 ? '#16a34a' : s >= 40 ? '#d97706' : '#dc2626' }}>{s}</div>
+                      <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 2 }}>/ 100</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', marginBottom: 24 }}>
+                  <div style={{ fontSize: 64, fontWeight: 800, lineHeight: 1, color: atsModal.score >= 70 ? '#16a34a' : atsModal.score >= 40 ? '#d97706' : '#dc2626' }}>
+                    {atsModal.score}
+                  </div>
+                  <div style={{ fontSize: 13, color: '#94a3b8', marginTop: 4 }}>out of 100</div>
+                </div>
+              )}
+
+              {/* Keywords (show tailored if available) */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                    Matched ({activeKw.matched.length})
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {activeKw.matched.map(kw => (
+                      <span key={kw} style={{ background: '#f0fdf4', color: '#166534', border: '1px solid #bbf7d0', fontSize: 12, padding: '2px 8px', borderRadius: 10 }}>{kw}</span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#dc2626', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                    Missing ({activeKw.missing.length})
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    {activeKw.missing.map(kw => (
+                      <span key={kw} style={{ background: '#fef2f2', color: '#991b1b', border: '1px solid #fecaca', fontSize: 12, padding: '2px 8px', borderRadius: 10 }}>{kw}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Tailored resume upload */}
+              <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid #f1f5f9' }}>
+                {tailored === 'loading' ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#64748b' }}>
+                    <span className="spinner" style={{ borderTopColor: '#475569', borderColor: 'rgba(0,0,0,0.1)' }} />
+                    Scoring tailored resume…
+                  </div>
+                ) : !tailored ? (
+                  <label style={{ cursor: 'pointer' }}>
+                    <input
+                      ref={tailoredInputRef}
+                      type="file"
+                      accept=".pdf"
+                      style={{ display: 'none' }}
+                      onChange={e => { if (e.target.files[0]) handleTailoredUpload(e.target.files[0]) }}
+                    />
+                    <span className="btn btn-ghost btn-sm" style={{ display: 'inline-flex', gap: 6, cursor: 'pointer' }}>
+                      📄 Score with tailored resume
+                    </span>
+                  </label>
+                ) : (
+                  <label style={{ cursor: 'pointer' }}>
+                    <input
+                      ref={tailoredInputRef}
+                      type="file"
+                      accept=".pdf"
+                      style={{ display: 'none' }}
+                      onChange={e => { if (e.target.files[0]) handleTailoredUpload(e.target.files[0]) }}
+                    />
+                    <span className="btn btn-ghost btn-sm" style={{ display: 'inline-flex', gap: 6, cursor: 'pointer' }}>
+                      📄 Re-score with different resume
+                    </span>
+                  </label>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Stats */}
       <div className="stats-row">
         <div className="stat-card">
@@ -290,6 +456,7 @@ export default function Dashboard({ stats, onStatsChange, isAdmin }) {
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  {hasResume && <ATSBadge score={atsScores[job.id]} onClick={e => handleATSClick(e, job)} />}
                   {isIntern && <RolePill color="violet">INTERN</RolePill>}
                   {isApm    && <RolePill color="green">APM</RolePill>}
                   {job.is_new && <span className="new-pill">NEW</span>}
@@ -303,6 +470,32 @@ export default function Dashboard({ stats, onStatsChange, isAdmin }) {
         </div>
       )}
     </div>
+  )
+}
+
+function ATSBadge({ score, onClick }) {
+  let bg = '#f1f5f9', color = '#64748b', label = 'ATS'
+  if (score === 'loading') {
+    label = '…'
+  } else if (score) {
+    label = `${score.score}%`
+    if (score.score >= 70)      { bg = '#f0fdf4'; color = '#16a34a' }
+    else if (score.score >= 40) { bg = '#fffbeb'; color = '#d97706' }
+    else                        { bg = '#fef2f2'; color = '#dc2626' }
+  }
+  return (
+    <span
+      onClick={onClick}
+      title="ATS keyword score"
+      style={{
+        background: bg, color, border: `1px solid ${color}22`,
+        fontSize: 11, fontWeight: 700,
+        padding: '2px 8px', borderRadius: 10, whiteSpace: 'nowrap',
+        cursor: 'pointer', userSelect: 'none',
+      }}
+    >
+      {label}
+    </span>
   )
 }
 

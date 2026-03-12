@@ -70,6 +70,14 @@ class WebsiteResponse(BaseModel):
     created_at: datetime
 
 
+class Resume(Base):
+    __tablename__ = "resume"
+
+    id = Column(Integer, primary_key=True, index=True)
+    text = Column(Text, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow)
+
+
 class JobResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 

@@ -1,11 +1,14 @@
 import json
 import logging
 import os
+import re
 from contextlib import asynccontextmanager
 from datetime import datetime
 
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException
+import io
+import pdfplumber
+from fastapi import Depends, FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -14,7 +17,7 @@ from typing import Optional
 load_dotenv()
 
 from database import Base, engine, get_db
-from models import Job, JobResponse, Website, WebsiteCreate, WebsiteResponse
+from models import Job, JobResponse, Resume, Website, WebsiteCreate, WebsiteResponse
 from scheduler import check_all_websites, start_scheduler, stop_scheduler, update_schedule
 from email_service import send_new_jobs_email
 
@@ -269,6 +272,105 @@ def get_stats(db: Session = Depends(get_db)):
         "new_jobs": new_jobs,
         "total_sites": total_sites,
     }
+
+
+# ── ATS ───────────────────────────────────────────────────────────────────────
+
+_TITLE_STOPWORDS = {
+    'a','an','the','and','or','of','in','at','to','for','with','on','as',
+    'is','are','be','by','from','its','it','this','that','new','grad',
+    'summer','fall','winter','spring','full','part','time','role','position',
+    'job','opportunity','program','us','co','inc','llc','&',
+}
+
+_BASE_PM_KW = [
+    "product management", "roadmap", "stakeholder", "metrics", "strategy",
+    "cross-functional", "prioritization", "user research", "agile", "scrum",
+    "data-driven", "go-to-market", "product launch", "KPI", "OKR",
+    "A/B testing", "product strategy", "backlog", "sprint", "product vision",
+]
+
+_ENTRY_KW = [
+    "analytical", "communication", "collaborative", "problem solving",
+    "SQL", "presentation", "teamwork", "Excel", "Python", "data analysis",
+]
+
+_APM_KW = [
+    "APM", "associate product manager", "product sense", "growth",
+    "technical", "analytical thinking",
+]
+
+
+def _build_keywords(title: str, company: str | None) -> list[str]:
+    title_lower = title.lower()
+    words = [w.lower() for w in re.findall(r'[a-zA-Z]{3,}', title)
+             if w.lower() not in _TITLE_STOPWORDS]
+    kw: list[str] = list(dict.fromkeys(words))
+    if company:
+        kw.append(company.lower())
+    kw.extend(_BASE_PM_KW)
+    if any(w in title_lower for w in ('intern', 'internship', 'entry')):
+        kw.extend(_ENTRY_KW)
+    if any(w in title_lower for w in ('apm', 'associate product', 'rotational')):
+        kw.extend(_APM_KW)
+    seen: set[str] = set()
+    result = []
+    for k in kw:
+        if k not in seen:
+            seen.add(k)
+            result.append(k)
+    return result
+
+
+def _score(resume_text: str, keywords: list[str]) -> dict:
+    text = resume_text.lower()
+    matched = [kw for kw in keywords if kw.lower() in text]
+    missing = [kw for kw in keywords if kw.lower() not in text]
+    score = round(len(matched) / len(keywords) * 100) if keywords else 0
+    return {"score": score, "matched": matched, "missing": missing}
+
+
+@app.get("/api/resume")
+def get_resume(db: Session = Depends(get_db)):
+    row = db.query(Resume).first()
+    return {"exists": row is not None}
+
+
+class ATSRequest(BaseModel):
+    job_id: int
+
+
+@app.post("/api/ats-score")
+def ats_score(payload: ATSRequest, db: Session = Depends(get_db)):
+    resume = db.query(Resume).first()
+    if not resume:
+        raise HTTPException(status_code=404, detail="No resume found")
+    job = db.query(Job).filter(Job.id == payload.job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    keywords = _build_keywords(job.title, job.company)
+    return _score(resume.text, keywords)
+
+
+@app.post("/api/ats-score-temp")
+async def ats_score_temp(
+    job_id: int = Form(...),
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    content = await file.read()
+    try:
+        with pdfplumber.open(io.BytesIO(content)) as pdf:
+            text = "\n".join(page.extract_text() or "" for page in pdf.pages)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Could not read PDF: {e}")
+    if not text.strip():
+        raise HTTPException(status_code=400, detail="No text found in PDF")
+    keywords = _build_keywords(job.title, job.company)
+    return _score(text, keywords)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
