@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { api } from '../api'
 
-export default function Settings() {
+export default function Settings({ isAdmin }) {
   const [settings, setSettings] = useState(null)
   const [interval, setInterval] = useState('6')
   const [email, setEmail] = useState('')
@@ -51,11 +51,11 @@ export default function Settings() {
 
   return (
     <div>
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 20 }}>Settings</h2>
+      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 20, maxWidth: 540, margin: '0 auto 20px' }}>Settings</h2>
 
       {alert && <div className={`alert alert-${alert.type}`}>{alert.msg}</div>}
 
-      <div className="card" style={{ maxWidth: 540 }}>
+      <div className="card" style={{ maxWidth: 540, margin: '0 auto' }}>
         <form onSubmit={handleSave}>
           <div className="settings-section">
             <h3>Schedule</h3>
@@ -91,7 +91,7 @@ export default function Settings() {
                 ? '✓ Gmail SMTP is configured via environment variables.'
                 : '⚠ Gmail SMTP not configured. Set SMTP_USER and SMTP_PASSWORD in your .env file.'}
             </div>
-            {settings.smtp_configured && (
+            {settings.smtp_configured && isAdmin && (
               <button
                 type="button"
                 className="btn btn-ghost btn-sm"
@@ -117,13 +117,15 @@ export default function Settings() {
             </div>
           </div>
 
-          <button type="submit" className="btn btn-primary" disabled={saving}>
-            {saving ? <><span className="spinner" style={{ borderTopColor: '#fff' }} /> Saving…</> : 'Save settings'}
-          </button>
+          {isAdmin && (
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? <><span className="spinner" style={{ borderTopColor: '#fff' }} /> Saving…</> : 'Save settings'}
+            </button>
+          )}
         </form>
       </div>
 
-      <div className="card" style={{ maxWidth: 540, marginTop: 16 }}>
+      <div className="card" style={{ maxWidth: 540, margin: '16px auto 0' }}>
         <div className="card-title" style={{ marginBottom: 12 }}>Environment Variables</div>
         <p style={{ fontSize: 13, color: '#475569', marginBottom: 10 }}>
           Configure these in your <code style={{ background: '#f1f5f9', padding: '1px 5px', borderRadius: 4 }}>.env</code> file:

@@ -61,9 +61,14 @@ function formatPostedDate(postedAt, firstSeen) {
   return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+function getFaviconUrl(jobUrl) {
+  try { return `https://www.google.com/s2/favicons?domain=${new URL(jobUrl).hostname}&sz=32` }
+  catch { return null }
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function Dashboard({ stats, onStatsChange }) {
+export default function Dashboard({ stats, onStatsChange, isAdmin }) {
   const [jobs, setJobs] = useState([])
   const [loading, setLoading] = useState(true)
   const [checking, setChecking] = useState(false)
@@ -148,14 +153,16 @@ export default function Dashboard({ stats, onStatsChange }) {
           <h2 style={{ fontSize: 18, fontWeight: 700 }}>Job Openings</h2>
           {newCount > 0 && <span className="badge">{newCount} new</span>}
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          {newCount > 0 && (
-            <button className="btn btn-ghost btn-sm" onClick={handleMarkAllSeen}>Mark all seen</button>
-          )}
-          <button className="btn btn-primary btn-sm" onClick={handleCheckNow} disabled={checking}>
-            {checking ? <><span className="spinner" /> Checking…</> : '⟳ Check now'}
-          </button>
-        </div>
+        {isAdmin && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            {newCount > 0 && (
+              <button className="btn btn-ghost btn-sm" onClick={handleMarkAllSeen}>Mark all seen</button>
+            )}
+            <button className="btn btn-primary btn-sm" onClick={handleCheckNow} disabled={checking}>
+              {checking ? <><span className="spinner" /> Checking…</> : '⟳ Check now'}
+            </button>
+          </div>
+        )}
       </div>
 
       {alert && <div className={`alert alert-${alert.type}`}>{alert.msg}</div>}
@@ -252,13 +259,28 @@ export default function Dashboard({ stats, onStatsChange }) {
             const isIntern = matchesRole(job.title, 'intern')
             const isApm    = matchesRole(job.title, 'apm')
             return (
-              <div key={job.id} className={`job-card ${job.is_new ? 'is-new' : ''}`}>
+              <div
+                key={job.id}
+                className={`job-card ${job.is_new ? 'is-new' : ''}`}
+                onClick={() => window.open(job.url, '_blank', 'noopener,noreferrer')}
+              >
                 <div className="job-info">
-                  <a className="job-title" href={job.url} target="_blank" rel="noopener noreferrer">
+                  <a className="job-title" href={job.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>
                     {job.title}
                   </a>
                   <div className="job-meta">
-                    {job.company     && <span className="job-meta-item">🏢 {job.company}</span>}
+                    {job.company && (
+                      <span className="job-meta-item">
+                        <img
+                          src={getFaviconUrl(job.url)}
+                          width={16} height={16}
+                          style={{ borderRadius: 3, flexShrink: 0 }}
+                          onError={e => { e.target.style.display = 'none' }}
+                          alt=""
+                        />
+                        {job.company}
+                      </span>
+                    )}
                     {job.location    && <span className="job-meta-item">📍 {job.location}</span>}
                     {job.website_name && <span className="job-meta-item">🔗 {job.website_name}</span>}
                     <span className="job-meta-item">
@@ -271,8 +293,8 @@ export default function Dashboard({ stats, onStatsChange }) {
                   {isIntern && <RolePill color="violet">INTERN</RolePill>}
                   {isApm    && <RolePill color="green">APM</RolePill>}
                   {job.is_new && <span className="new-pill">NEW</span>}
-                  {job.is_new && (
-                    <button className="btn btn-ghost btn-sm" onClick={() => handleMarkSeen(job.id)} title="Mark as seen">✓</button>
+                  {job.is_new && isAdmin && (
+                    <button className="btn btn-ghost btn-sm" onClick={e => { e.stopPropagation(); handleMarkSeen(job.id) }} title="Mark as seen">✓</button>
                   )}
                 </div>
               </div>

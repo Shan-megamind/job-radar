@@ -7,7 +7,7 @@ function formatDate(dateStr) {
   return d.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-export default function WebsiteManager({ onStatsChange }) {
+export default function WebsiteManager({ onStatsChange, isAdmin }) {
   const [websites, setWebsites] = useState([])
   const [loading, setLoading] = useState(true)
   const [alert, setAlert] = useState(null)
@@ -105,7 +105,7 @@ export default function WebsiteManager({ onStatsChange }) {
       )}
 
       {/* Add form */}
-      <div className="card" style={{ marginBottom: 20 }}>
+      {isAdmin && <div className="card" style={{ marginBottom: 20 }}>
         <div className="card-header">
           <span className="card-title">Add Website</span>
         </div>
@@ -169,7 +169,7 @@ export default function WebsiteManager({ onStatsChange }) {
             </div>
           )}
         </form>
-      </div>
+      </div>}
 
       {/* Filter row */}
       {!loading && websites.length > 0 && (
@@ -191,7 +191,7 @@ export default function WebsiteManager({ onStatsChange }) {
             </button>
           </div>
 
-          {statusFilter === 'error' && errorCount > 0 && (
+          {statusFilter === 'error' && errorCount > 0 && isAdmin && (
             <button
               className="btn btn-danger btn-sm"
               onClick={handleRemoveErroring}
@@ -236,12 +236,14 @@ export default function WebsiteManager({ onStatsChange }) {
               <div style={{ fontSize: 13, color: '#64748b', whiteSpace: 'nowrap' }}>
                 {site.last_checked ? `Checked ${formatDate(site.last_checked)}` : 'Not checked yet'}
               </div>
-              <button
-                className="btn btn-danger btn-sm"
-                onClick={() => handleRemove(site.id, site.name || site.url)}
-              >
-                Remove
-              </button>
+              {isAdmin && (
+                <button
+                  className="btn btn-danger btn-sm"
+                  onClick={() => handleRemove(site.id, site.name || site.url)}
+                >
+                  Remove
+                </button>
+              )}
             </div>
           ))}
         </div>

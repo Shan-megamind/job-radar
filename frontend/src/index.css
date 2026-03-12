@@ -13,11 +13,10 @@ body {
 .navbar {
   background: #0f172a;
   color: #f8fafc;
-  padding: 0 24px;
+  padding: 18px 24px 0;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 32px;
-  height: 56px;
   position: sticky;
   top: 0;
   z-index: 100;
@@ -26,10 +25,11 @@ body {
 
 .navbar-brand {
   font-weight: 700;
-  font-size: 18px;
+  font-size: 20px;
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-bottom: 12px;
 }
 
 .nav-tabs { display: flex; gap: 4px; }
@@ -137,7 +137,7 @@ input.input-name { width: 180px; }
   gap: 16px;
   transition: box-shadow 0.15s;
 }
-.job-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+.job-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.1); background: #f8faff; cursor: pointer; }
 .job-card.is-new { border-left: 3px solid #2563eb; }
 
 .job-info { flex: 1; min-width: 0; }
@@ -214,6 +214,16 @@ input.input-name { width: 180px; }
   animation: spin 0.7s linear infinite;
 }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* Footer */
+.footer {
+  text-align: center;
+  padding: 28px 24px;
+  font-size: 13px;
+  color: #cbd5e1;
+  letter-spacing: 0.06em;
+  margin-top: auto;
+}
 
 /* Responsive */
 @media (max-width: 640px) {

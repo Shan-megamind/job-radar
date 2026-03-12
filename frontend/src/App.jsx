@@ -7,6 +7,7 @@ import { api } from './api'
 export default function App() {
   const [tab, setTab] = useState('dashboard')
   const [stats, setStats] = useState(null)
+  const isAdmin = new URLSearchParams(window.location.search).get('admin') === 'jobradar2026'
 
   const loadStats = useCallback(async () => {
     try {
@@ -39,10 +40,12 @@ export default function App() {
       </nav>
 
       <main className="main">
-        {tab === 'dashboard' && <Dashboard stats={stats} onStatsChange={loadStats} />}
-        {tab === 'websites' && <WebsiteManager onStatsChange={loadStats} />}
-        {tab === 'settings' && <Settings />}
+        {tab === 'dashboard' && <Dashboard stats={stats} onStatsChange={loadStats} isAdmin={isAdmin} />}
+        {tab === 'websites' && <WebsiteManager onStatsChange={loadStats} isAdmin={isAdmin} />}
+        {tab === 'settings' && <Settings isAdmin={isAdmin} />}
       </main>
+
+      <footer className="footer">YOU'RE HIRED! Haha made you look</footer>
     </div>
   )
 }
