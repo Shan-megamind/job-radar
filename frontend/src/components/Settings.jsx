@@ -102,19 +102,21 @@ export default function Settings({ isAdmin }) {
                 {testing ? <><span className="spinner" style={{ borderTopColor: '#475569', borderColor: 'rgba(0,0,0,0.1)' }} /> Sending…</> : '✉ Send test email'}
               </button>
             )}
-            <div className="form-group">
-              <label>Notify email address</label>
-              <input
-                type="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                style={{ width: 300 }}
-              />
-              <span style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
-                Where to send new job alerts. Defaults to SMTP_USER if blank.
-              </span>
-            </div>
+            {isAdmin && (
+              <div className="form-group">
+                <label>Notify email address</label>
+                <input
+                  type="email"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={e => setEmail(e.target.value)}
+                  style={{ width: 300 }}
+                />
+                <span style={{ fontSize: 12, color: '#94a3b8', marginTop: 4 }}>
+                  Where to send new job alerts. Defaults to SMTP_USER if blank.
+                </span>
+              </div>
+            )}
           </div>
 
           {isAdmin && (
